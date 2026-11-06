@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5b4bdb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Potes">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Chat entre potes</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1c1b1a;--mute:#76726b;--line:#e4e1da;--acc:#5b4bdb;--accink:#fff;--theirs:#ebe8e1;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--bg:#161517;--card:#201f22;--ink:#f1efeb;--mute:#9b968d;--line:#333136;--acc:#6d5ff0;--theirs:#2b292e}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#app{height:100%;max-width:560px;margin:0 auto;display:flex;flex-direction:column}
+.view{display:none;flex:1;min-height:0;flex-direction:column}.view.on{display:flex}
+header{padding:14px 16px;border-bottom:1px solid var(--line);background:var(--card);display:flex;align-items:center;gap:10px}
+header h1{font-size:18px;margin:0;flex:1}
+button{font:inherit;border:0;border-radius:12px;padding:10px 14px;background:var(--acc);color:var(--accink)}
+button.ghost{background:none;color:var(--acc);padding:6px 10px}
+input{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0;width:100%}
+.center{margin:auto;padding:24px;width:100%;display:flex;flex-direction:column;gap:12px}
+.mute{color:var(--mute);font-size:14px}.err{color:#d23b3b;font-size:14px;min-height:1.2em}
+.row{display:flex;gap:8px;padding:12px 16px}
+#list{flex:1;overflow-y:auto;padding:0 8px}
+.item{display:flex;align-items:center;gap:12px;padding:12px 10px;border-radius:12px}
+.av{width:40px;height:40px;border-radius:50%;background:var(--acc);color:var(--accink);display:grid;place-items:center;font-weight:700;text-transform:uppercase}
+#msgs{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.b{max-width:80%;padding:8px 12px;border-radius:16px;background:var(--theirs);align-self:flex-start;white-space:pre-wrap;overflow-wrap:anywhere}
+.b.me{background:var(--acc);color:var(--accink);align-self:flex-end}
+.t{font-size:11px;opacity:.65}
+footer{border-top:1px solid var(--line);background:var(--card)}
+.b img{max-width:100%;border-radius:10px;display:block}.b audio{max-width:100%;height:36px}.b a{color:inherit}.n{font-size:11px;opacity:.7;font-weight:600}.ic{background:none;font-size:20px;padding:6px}.rec{background:#d23b3b!important}
+#v-chat .row{padding:8px 10px;align-items:center}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="v-cfg" class="view"><div class="center"><h2>Configuration manquante</h2><p class="mute">Ouvre config.js et colle la config de ton projet Firebase (voir LISEZMOI.md).</p></div></div>
+
+<div id="v-login" class="view on"><div class="center">
+<h2>Chat entre potes</h2>
+<input id="em" type="email" placeholder="E‑mail" autocomplete="email">
+<input id="pw" type="password" placeholder="Mot de passe (6+ caractères)" autocomplete="current-password">
+<div class="err" id="lerr"></div>
+<button id="lin">Se connecter</button>
+<button class="ghost" id="lup">Créer un compte</button></div></div>
+
+<div id="v-id" class="view"><div class="center">
+<h2>Choisis ton ID</h2>
+<p class="mute">Tes potes te trouvent avec cet ID (a–z, 0–9, _ ; 3 à 20 caractères).</p>
+<input id="idin" placeholder="ex : max_92" autocapitalize="none" maxlength="20">
+<div class="err" id="iderr"></div><button id="idbtn">Valider</button></div></div>
+
+<div id="v-home" class="view">
+<header><h1>Discussions</h1><span class="mute" id="mine"></span><button class="ghost" id="newg">+ Groupe</button><button class="ghost" id="out">Quitter</button></header>
+<div class="row"><input id="addin" placeholder="ID d’un pote" autocapitalize="none"><button id="addbtn">Ajouter</button></div>
+<div class="err" id="adderr" style="padding:0 16px"></div>
+<div id="list"></div></div>
+
+<div id="v-grp" class="view"><div class="center">
+<h2>Nouveau groupe</h2>
+<input id="gname" placeholder="Nom du groupe" maxlength="40">
+<input id="gmem" placeholder="IDs des potes, séparés par des virgules" autocapitalize="none">
+<div class="err" id="gerr"></div><button id="gok">Créer</button><button class="ghost" id="gcancel">Annuler</button></div></div>
+
+<div id="v-chat" class="view">
+<header><button class="ghost" id="back">←</button><h1 id="who"></h1></header>
+<div id="msgs"></div>
+<footer><div class="row"><button class="ic" id="pic">📷</button><button class="ic" id="mic">🎤</button><button class="ic" id="loc">📍</button><input id="txt" placeholder="Message…" maxlength="2000"><button id="sendbtn">➤</button><input type="file" id="file" accept="image/*" hidden></div></footer></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const show=id=>document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+id));
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+const clean=s=>(s||'').trim().toLowerCase().replace(/^@/,'');
+const valid=h=>/^[a-z0-9_]{3,20}$/.test(h);
+const msg=e=>({'auth/invalid-credential':'E‑mail ou mot de passe incorrect.','auth/email-already-in-use':'Cet e‑mail a déjà un compte.','auth/weak-password':'Mot de passe trop court (6 min).','auth/invalid-email':'E‑mail invalide.'}[e.code]||e.message);
+let auth,db,me,prof,unC,unM,conv;
+if(FIREBASE_CONFIG.apiKey==="COLLE_ICI"){show('cfg')}else{
+firebase.initializeApp(FIREBASE_CONFIG);auth=firebase.auth();db=firebase.firestore();
+auth.onAuthStateChanged(async u=>{
+  if(!u){me=null;unC&&unC();unM&&unM();show('login');return}
+  me=u.uid;
+  try{const s=await db.doc('users/'+me).get();if(s.exists){prof=s.data();home()}else show('id')}
+  catch(e){show('id')}
+});}
+$('#lin').onclick=()=>auth.signInWithEmailAndPassword($('#em').value.trim(),$('#pw').value).catch(e=>$('#lerr').textContent=msg(e));
+$('#lup').onclick=()=>auth.createUserWithEmailAndPassword($('#em').value.trim(),$('#pw').value).catch(e=>$('#lerr').textContent=msg(e));
+$('#out').onclick=()=>auth.signOut();
+$('#idbtn').onclick=async()=>{
+  const h=clean($('#idin').value),er=$('#iderr');er.textContent='';
+  if(!valid(h)){er.textContent='ID invalide.';return}
+  try{
+    if((await db.doc('handles/'+h).get()).exists){er.textContent='ID déjà pris.';return}
+    const b=db.batch();b.set(db.doc('handles/'+h),{uid:me});b.set(db.doc('users/'+me),{handle:h});await b.commit();
+    prof={handle:h};home();
+  }catch(e){er.textContent='ID déjà pris ou erreur : '+e.message}
+};
+function home(){
+  show('home');$('#mine').textContent='@'+prof.handle;unC&&unC();
+  unC=db.collection('chats').where('members','array-contains',me).onSnapshot(s=>{
+    const l=$('#list');l.textContent='';
+    if(s.empty){const p=document.createElement('p');p.className='mute';p.style.padding='12px';p.textContent='Aucune discussion. Ajoute l’ID d’un pote.';l.append(p)}
+    s.docs.forEach(d=>{
+      const c=d.data(),o=c.members.find(x=>x!==me),h=c.group?c.name:(c.handles||{})[o]||'?';
+      const it=document.createElement('div');it.className='item';
+      const av=document.createElement('div');av.className='av';av.textContent=h[0];
+      const n=document.createElement('div');n.textContent=(c.group?'👥 ':'@')+h;
+      it.append(av,n);it.onclick=()=>openChat(d.id,n.textContent);l.append(it);
+    });
+  },e=>$('#adderr').textContent=e.message);
+}
+$('#addbtn').onclick=async()=>{
+  const h=clean($('#addin').value),er=$('#adderr');er.textContent='';
+  if(!valid(h))return;if(h===prof.handle){er.textContent='C’est toi 😄';return}
+  try{
+    const s=await db.doc('handles/'+h).get();if(!s.exists){er.textContent='Aucun pote avec cet ID.';return}
+    const f=s.data().uid,id=[me,f].sort().join('_');
+    await db.doc('chats/'+id).set({members:[me,f],handles:{[me]:prof.handle,[f]:h}}).catch(()=>{});
+    $('#addin').value='';
+  }catch(e){er.textContent=e.message}
+};
+function openChat(id,h){
+  conv=id;$('#who').textContent=h;show('chat');unM&&unM();
+  const box=$('#msgs');box.textContent='';
+  unM=db.collection('chats/'+id+'/msgs').orderBy('t').limit(300).onSnapshot(s=>{
+    box.textContent='';
+    s.docs.forEach(d=>{
+      const m=d.data(),b=document.createElement('div');b.className='b'+(m.u===me?' me':'');
+      const x=body(m);
+      const t=document.createElement('div');t.className='t';t.textContent=new Date(m.t).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+      b.append(x,t);box.append(b);
+    });
+    box.scrollTop=box.scrollHeight;
+  });
+}
+async function post(o){try{await db.collection('chats/'+conv+'/msgs').add({u:me,h:prof.handle,t:Date.now(),...o})}catch(e){alert('Envoi impossible : '+e.message)}}
+async function send(){const i=$('#txt'),text=i.value.trim();if(!text)return;i.value='';post({type:'txt',text})}
+$('#sendbtn').onclick=send;$('#txt').onkeydown=e=>{if(e.key==='Enter')send()};
+$('#addin').onkeydown=e=>{if(e.key==='Enter')$('#addbtn').click()};
+$('#back').onclick=()=>{unM&&unM();show('home')};
+function body(m){
+ const x=document.createElement('div');
+ if(m.u!==me&&m.h){const n=document.createElement('div');n.className='n';n.textContent=m.h;x.append(n)}
+ const ok=/^data:(image|audio)\//.test(m.data||'');
+ if(m.type==='img'&&ok){const i=document.createElement('img');i.src=m.data;i.onclick=()=>window.open(m.data);x.append(i)}
+ else if(m.type==='aud'&&ok){const a=document.createElement('audio');a.controls=true;a.src=m.data;x.append(a)}
+ else if(m.type==='loc'&&isFinite(m.lat)&&isFinite(m.lng)){const a=document.createElement('a');a.href='https://www.openstreetmap.org/?mlat='+m.lat+'&mlon='+m.lng+'#map=16/'+m.lat+'/'+m.lng;a.target='_blank';a.rel='noopener';a.textContent='📍 Position partagée';x.append(a)}
+ else x.append(document.createTextNode(m.text||''));
+ return x;
+}
+$('#newg').onclick=()=>{$('#gerr').textContent='';show('grp')};
+$('#gcancel').onclick=()=>show('home');
+$('#gok').onclick=async()=>{
+ const name=$('#gname').value.trim(),er=$('#gerr');er.textContent='';
+ const hs=[...new Set($('#gmem').value.split(/[\s,;]+/).map(clean).filter(Boolean))].filter(h=>h!==prof.handle);
+ if(!name||!hs.length){er.textContent='Un nom et au moins un ID.';return}
+ try{
+  const members=[me],handles={[me]:prof.handle};
+  for(const h of hs){const x=await db.doc('handles/'+h).get();if(!x.exists){er.textContent='ID introuvable : '+h;return}members.push(x.data().uid);handles[x.data().uid]=h}
+  await db.collection('chats').add({group:true,name,members,handles});
+  $('#gname').value=$('#gmem').value='';show('home');
+ }catch(e){er.textContent=e.message}
+};
+$('#pic').onclick=()=>$('#file').click();
+$('#file').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+ const im=new Image();im.onload=()=>{const k=Math.min(1,900/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);post({type:'img',data:c.toDataURL('image/jpeg',.6)});URL.revokeObjectURL(im.src)};im.src=URL.createObjectURL(f)};
+let rec,chunks,rt;
+$('#mic').onclick=async()=>{
+ if(rec){rec.stop();return}
+ try{
+  const st=await navigator.mediaDevices.getUserMedia({audio:true});
+  const r=new MediaRecorder(st,{audioBitsPerSecond:24000});rec=r;chunks=[];
+  r.ondataavailable=e=>chunks.push(e.data);
+  r.onstop=()=>{clearTimeout(rt);st.getTracks().forEach(t=>t.stop());rec=null;$('#mic').classList.remove('rec');
+   const fr=new FileReader();fr.onload=()=>{if(fr.result.length>900000){alert('Vocal trop long.');return}post({type:'aud',data:fr.result})};fr.readAsDataURL(new Blob(chunks,{type:r.mimeType}))};
+  r.start();$('#mic').classList.add('rec');rt=setTimeout(()=>{rec&&rec.stop()},45000);
+ }catch(e){alert('Micro refusé.')}
+};
+$('#loc').onclick=()=>navigator.geolocation?navigator.geolocation.getCurrentPosition(p=>post({type:'loc',lat:p.coords.latitude,lng:p.coords.longitude}),()=>alert('Localisation refusée.'),{enableHighAccuracy:true,timeout:15000}):alert('Non supporté.');
+</script>
+</body>
+</html>
